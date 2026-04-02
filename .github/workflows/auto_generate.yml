@@ -1,0 +1,42 @@
+name: 每日早报自动生成
+on:
+  schedule:
+    - cron: "30 23 * * *"  # 北京时间 7:30
+  workflow_dispatch:        # 允许手动点一下运行（测试用）
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 🔥 必须加这个，否则没有权限提交
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: 设置Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装依赖
+        run: pip install openai
+
+      - name: 运行早报生成脚本
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        run: python generate_report.py
+
+      - name: 查看生成的文件（调试）
+        run: ls -la *.txt
+
+      - name: 提交并推送文件
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
+          force: true

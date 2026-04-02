@@ -1,0 +1,31 @@
+name: 每日早报自动生成
+on:
+  schedule:
+    - cron: "30 23 * * *"  # 北京时间 7:30
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: 安装依赖
+        run: pip install openai
+
+      - name: 运行早报生成
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        run: python generate_report.py
+
+      - name: 提交到 GitHub
+        run: |
+          git config --global user.name "auto"
+          git config --global user.email "auto@github.com"
+          git add *.txt
+          git commit -m "自动生成早报"
+          git push

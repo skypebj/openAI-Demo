@@ -2,53 +2,47 @@ import os
 from datetime import datetime
 from openai import OpenAI
 
-# ==============================================
-# DEBUG 模式：开启详细日志（全程打印执行步骤）
-# ==============================================
+# ===================== DEBUG 输出开关 =====================
 DEBUG = True
 
 def debug_print(msg):
     if DEBUG:
         print(f"[DEBUG] {msg}")
 
-# ====================== 初始化客户端 ======================
-debug_print("开始初始化 OpenAI 客户端")
-debug_print(f"从环境变量读取 API_KEY: {'已配置' if os.environ.get('OPENAI_API_KEY') else '缺失'}")
-debug_print(f"从环境变量读取 API_BASE: {'已配置' if os.environ.get('OPENAI_API_BASE') else '缺失'}")
-debug_print(f"从环境变量读取 MODEL: {os.environ.get('OPENAI_MODEL')}")
+# ===================== 初始化 AI 客户端 =====================
+debug_print("=== 开始初始化 OpenAI 客户端 ===")
+api_key = os.environ.get("OPENAI_API_KEY")
+api_base = os.environ.get("OPENAI_API_BASE")
+model = os.environ.get("OPENAI_MODEL")
 
-client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),
-    base_url=os.environ.get("OPENAI_API_BASE")
-)
-debug_print("OpenAI 客户端初始化完成")
+debug_print(f"API_KEY: {'已配置' if api_key else '缺失'}")
+debug_print(f"API_BASE: {'已配置' if api_base else '缺失'}")
+debug_print(f"MODEL: {model if model else '未配置'}")
 
-# ====================== 生成唯一文件名 ======================
+if not api_key or not api_base or not model:
+    debug_print("错误：环境变量缺失")
+    exit(1)
+
+client = OpenAI(api_key=api_key, base_url=api_base)
+debug_print("=== 客户端初始化完成 ===")
+
+# ===================== 生成唯一文件名 =====================
 def get_unique_filename():
-    debug_print("进入文件名生成函数")
-    
+    debug_print("生成文件名...")
     date_str = datetime.now().strftime("%y%m%d")
-    debug_print(f"当前日期格式化为: {date_str}")
-    
     index = 1
-    debug_print(f"初始文件序号: {index}")
-    
     while True:
         filename = f"{date_str}-{index}.txt"
-        debug_print(f"检查文件是否存在: {filename}")
-        
         if not os.path.exists(filename):
-            debug_print(f"文件不存在，使用该文件名: {filename}")
+            debug_print(f"使用文件名：{filename}")
             return filename
-        
-        debug_print(f"文件已存在，序号+1: {index} -> {index+1}")
+        debug_print(f"{filename} 已存在，序号+1")
         index += 1
 
-# ====================== 生成并保存早报 ======================
+# ===================== 生成早报（你的完整提示词） =====================
 def generate_morning_report():
-    debug_print("===== 进入早报生成主函数 =====")
-    
-    # 最新提示词（你提供的完整版）
+    debug_print("===== 开始生成早报 =====")
+
     prompt = """请为我整理一份早报，内容专业、客观、简洁，重点突出，结构清晰
 第一部分、投资金融领域
 要求内容专业、客观、简洁，重点突出，结构清晰，覆盖以下内容：
@@ -67,49 +61,39 @@ A 股市场前瞻：昨日 A 股收盘总结、北向资金流向、龙虎榜要
 国内要闻：重要政策、产业趋势、科技进展、民生与社会热点。
 国际动态：全球政治经济、科技竞争、国际合作与重大事件。
 科技前沿：人工智能、半导体、新能源、生物医药、航天航空等领域突破。
-科学研究：预印本头条、重大科技突破。
 商业与产业：巨头动态、商业模式创新、行业格局变化。
 文化、社会、科普：有价值的社会观察、科普知识、历史文化、健康常识。
 会议：国内重要政治、经济会议。
 要求：客观中立、信息密度高，适合提升认知，避免娱乐化碎片化内容。"""
 
-    debug_print("提示词加载完成，长度：%d 字符" % len(prompt))
-
     try:
-        debug_print("开始调用 AI 接口生成内容")
-        debug_print(f"使用模型: {os.environ.get('OPENAI_MODEL')}")
-        
+        debug_print("调用 AI 生成...")
         response = client.chat.completions.create(
-            model=os.environ.get("OPENAI_MODEL"),
-            messages=[{"role": "user", "content": prompt}]
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            timeout=180
         )
-        debug_print("AI 接口调用成功，开始解析返回结果")
 
-        # 解析内容
         content = response.choices[0].message.content
-        debug_print(f"AI 返回内容长度: {len(content)} 字符")
-        debug_print(f"返回内容预览: {content[:80]}...")
+        if not content or len(content) < 50:
+            debug_print("错误：内容过短")
+            return False
 
-        # 生成文件名
+        debug_print(f"生成完成，长度：{len(content)} 字符")
         filename = get_unique_filename()
-        debug_print(f"最终确定保存文件名: {filename}")
 
-        # 写入文件
-        debug_print("开始打开文件并写入内容")
         with open(filename, "w", encoding="utf-8") as f:
             f.write(content)
-        debug_print("文件写入完成，关闭文件")
+            f.flush()
 
-        debug_print("===== 全部流程执行成功 =====")
-        print(f"\n✅ 早报生成完成：{filename}")
+        debug_print(f"文件保存成功：{filename}")
+        print(f"✅ 早报生成完成：{filename}")
+        return True
 
     except Exception as e:
-        debug_print(f"捕获异常: {type(e).__name__}")
-        debug_print(f"异常详情: {str(e)}")
-        print(f"\n❌ 执行失败：{e}")
+        debug_print(f"异常：{str(e)}")
+        return False
 
-# ====================== 运行 ======================
+# ===================== 运行 =====================
 if __name__ == "__main__":
-    debug_print("程序启动，进入主执行入口")
     generate_morning_report()
-    debug_print("程序结束")
